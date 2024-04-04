@@ -22,3 +22,7 @@ fastapi-cors
 
 # For report generation and working with PDFs
 reportlab
+
+openpyxl
+
+python-multipart

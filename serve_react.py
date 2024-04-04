@@ -2,7 +2,7 @@ import http.server
 import socketserver
 import os
 
-PORT = 8000
+PORT = 3000
 DIRECTORY = "ddq-chat/build"
 
 class Handler(http.server.SimpleHTTPRequestHandler):
