@@ -1,0 +1,35 @@
+/* Using variables defined in App.css for consistency */
+.responseContainer {
+    background-color: var(--background-color); /* Light background for the response area */
+    border-radius: 8px; /* Rounded corners */
+    padding: 15px; /* Padding around the text */
+    margin: 10px 0; /* Margin around the container */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Soft shadow for depth */
+    font-family: var(--font-family); /* Consistent font */
+    color: var(--text-color); /* Text color */
+    line-height: 1.6; /* Spacing between lines */
+  }
+  
+  /* Styling for paragraphs for better readability */
+  .responseContainer p {
+    margin-bottom: 1em; /* Space between paragraphs */
+  }
+  
+  /* Ensure lists are nicely formatted */
+  .responseContainer ul {
+    list-style-type: disc; /* Bullet points for lists */
+    padding-left: 20px; /* Indent list items */
+    margin-bottom: 1em; /* Space after the list */
+  }
+  
+  /* Style for list items */
+  .responseContainer li {
+    margin-bottom: 0.5em; /* Space between list items */
+  }
+  
+  /* Highlighted text (e.g., names, important terms) */
+  .responseContainer strong {
+    color: var(--primary-color); /* Consistent color for emphasis */
+    font-weight: bold; /* Ensure it's bold */
+  }
+  

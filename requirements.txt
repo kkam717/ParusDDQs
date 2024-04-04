@@ -1,0 +1,24 @@
+# For PDF extraction and table reading
+tabula-py
+
+# For data manipulation
+pandas
+
+# For loading environment variables
+python-dotenv
+
+# For working with JSON data
+# No need to add an entry here because JSON support is built into Python's standard library
+
+# For OpenAI API usage
+openai
+
+# For creating and running FastAPI applications
+fastapi
+uvicorn[standard]
+
+# For handling CORS in FastAPI applications
+fastapi-cors
+
+# For report generation and working with PDFs
+reportlab
