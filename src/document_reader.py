@@ -41,6 +41,10 @@ class Query(BaseModel):
 load_dotenv()
 client = OpenAI()
 
+global_data_context = ""
+global_data_type = ""
+global_file_loc = ""
+
 categories = ['General Information', 'UCITS', 'Marketing (HR, Client base)', 'Legal', 'ESG', 'Trading', 'Operations', 'Compliance', 'IT', 'Investments']
 
 
@@ -79,7 +83,6 @@ def parse_ddq(pdf_path, output_path, output):
                 df = df.T.reset_index().T.reset_index(drop=True)
                 df.columns = head
 
-                # print(df)
 
                 for i in range(len(df)):
                     for j in head:
@@ -97,7 +100,6 @@ def parse_ddq(pdf_path, output_path, output):
             df = df.T.reset_index().T.reset_index(drop=True)
             df.columns = head
 
-            # print(df)
 
             for i in range(len(df)):
                 for j in head:
@@ -210,16 +212,26 @@ def produce_pdf(requests, responses):
 
 @app.post("/api/response/")
 async def get_response(query: Query):
+    global global_data_context, global_data_type, global_file_loc, sheets
     try:
         question = query.query
+        
+        response = ""
 
-        category = sort_question(question)
+        if global_data_type == "excel":
+            category = sort_question(question)
+            global_data_context = spreadsheet_data_to_context(category, sheets)
+            response = get_gpt4_response(question, global_data_context)
 
-        parsed_context = spreadsheet_data_to_context(category, sheets)
+        elif global_data_type == "pdf":
+            response = get_gpt4_response(question, global_data_context)
 
-        response = get_gpt4_response(question, parsed_context)
+        else:
+            parsed_context = spreadsheet_data_to_context(category, sheets)
+            response = get_gpt4_response(question, global_data_context)
 
         return {"response": response}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -251,6 +263,43 @@ async def upload_pdf(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         print(e)
+
+
+@app.post("/upload/")
+async def upload_file(file: UploadFile = File(...)):
+    global global_data_context, global_data_type, global_file_loc, sheets
+
+    # Ensure the 'uploads' directory exists
+    uploads_dir = 'uploads'
+    os.makedirs(uploads_dir, exist_ok=True)
+
+    for item in os.listdir(uploads_dir):
+        item_path = os.path.join(uploads_dir, item)
+        
+        # Check if it is a file or a directory
+        if os.path.isfile(item_path) or os.path.islink(item_path):
+            os.remove(item_path)  # Remove the file or link
+
+    try:
+        global_file_loc = os.path.join(uploads_dir, file.filename)
+
+        with open(global_file_loc, "wb") as buffer:
+            buffer.write(await file.read())
+
+        # Process file based on extension
+        if file.filename.endswith('.pdf'):
+            global_data_context = parse_ddq(global_file_loc, "uploads/parsedUpload.txt", True)
+            global_data_type = "pdf"
+        elif file.filename.endswith('.xlsx') or file.filename.endswith('.xls'):
+            sheets = pd.read_excel(global_file_loc, sheet_name=None) 
+            global_data_type = "excel"
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+
+        return {"message": "File uploaded and processed successfully"}
+    except Exception as e:
+        print(e)
+        return {"message": "Error processing file"}
 
 
 if __name__ == "__main__":
