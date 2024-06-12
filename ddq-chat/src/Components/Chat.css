@@ -1,0 +1,70 @@
+
+/* Adjustments to the chat-box class */
+.chat-box {
+    max-width: 600px;
+    height: 70vh; /* Fixed height for the chat box */
+    margin: 20px auto;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    overflow-y: auto; /* Enable vertical scrolling */
+    display: flex;
+    flex-direction: column;
+    background-color: #fff; /* Optional: background color for the chat box */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: adds a shadow for depth */
+  }
+  
+  /* You might also want to ensure the input form remains at the bottom */
+  .chat-box form {
+    margin-top: auto; /* Pushes the form to the bottom if using flex */
+  }
+  
+  /* Messages container */
+  .chat-box .message {
+    padding: 10px;
+    margin: 5px 20px;
+    border-radius: 20px;
+    color: #fff;
+    max-width: 80%;
+  }
+  
+  /* Differentiate between user and bot messages */
+  .chat-box .user {
+    background-color: #007bff;
+    align-self: flex-end;
+    border-bottom-right-radius: 0;
+  }
+  
+  .chat-box .bot {
+    background-color: #343a40;
+    align-self: flex-start;
+    border-bottom-left-radius: 0;
+  }
+  
+  /* Make the input field sleeker */
+  input {
+    flex-grow: 1;
+    padding: 8px 15px; /* Reduced padding for sleeker look */
+    border: 2px solid #007bff; /* Adjust border color to match your theme */
+    border-radius: 20px; /* Rounded borders for sleekness */
+    margin-right: 10px;
+    outline: none; /* Remove the default focus outline */
+  }
+  
+  input:focus {
+    border-color: #0056b3; /* Darker border color on focus */
+  }
+  
+  /* Adjustments for the send button to align with the input field styling */
+  button {
+    padding: 8px 20px; /* Adjust padding to match input field height */
+    background-color: #007bff;
+    border: none;
+    border-radius: 20px; /* Rounded borders to match the input field */
+    color: #fff;
+    cursor: pointer;
+    font-weight: bold; /* Optional: Adds emphasis to the button text */
+  }
+  
+  button:hover {
+    background-color: #0056b3;
+  }
