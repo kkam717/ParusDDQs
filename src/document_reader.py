@@ -5,6 +5,7 @@ import json
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+from typing import List
 
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.responses import FileResponse
@@ -44,11 +45,49 @@ client = OpenAI()
 global_data_context = ""
 global_data_type = ""
 global_file_loc = ""
+sheets = None
+
+# File to store persisted training data
+DATA_FILE = "DDQs/saved_training_data.json"
+
 
 categories = ['General Information', 'UCITS', 'Marketing (HR, Client base)', 'Legal', 'ESG', 'Trading', 'Operations', 'Compliance', 'IT', 'Investments']
 
 
-sheets = pd.read_excel('DDQs/DDQ MastersheetEB.xlsx', sheet_name=None) 
+try:
+    sheets = pd.read_excel('DDQs/DDQ MastersheetEB.xlsx', sheet_name=None) 
+except:
+    sheets = ""
+
+
+# Helper to save both context and data type
+def save_data_context():
+    data = {
+        "context": global_data_context,
+        "data_type": global_data_type  # Save the type of data as well
+    }
+    with open(DATA_FILE, 'w') as f:
+        json.dump(data, f)  # Use JSON format for structured storage
+
+
+# Load saved data on startup (create the file if it doesn't exist or it's empty)
+if not os.path.exists(DATA_FILE):
+    # Create an empty JSON file if it doesn't exist
+    with open(DATA_FILE, 'w') as f:
+        json.dump({"context": "", "data_type": ""}, f)
+else:
+    # Check if the file is empty or contains invalid JSON
+    try:
+        with open(DATA_FILE, 'r') as f:
+            saved_data = json.load(f)
+            global_data_context = saved_data.get("context", "")
+            global_data_type = saved_data.get("data_type", "")
+    except json.JSONDecodeError:
+        # Handle empty or invalid JSON by reinitializing the file with defaults
+        with open(DATA_FILE, 'w') as f:
+            json.dump({"context": "", "data_type": ""}, f)
+        global_data_context = ""
+        global_data_type = ""
 
 def spreadsheet_data_to_context(category, sheets):
     """
@@ -150,6 +189,7 @@ def get_questions(content):
     responses = []
 
     for question in questions_list:
+        print('q')
         category = sort_question(question)
         parsed_category = spreadsheet_data_to_context(category, sheets)
 
@@ -159,7 +199,7 @@ def get_questions(content):
     return [questions_list, responses]
 
 
-def produce_pdf(requests, responses):
+def produce_pdf(requests, responses, file_name):
     styles = getSampleStyleSheet()
     # Adjust the style for better content fit
     custom_style = ParagraphStyle(
@@ -178,7 +218,7 @@ def produce_pdf(requests, responses):
 
         data.append([req_content, resp_content])
 
-    file_name = 'DDQs/ddq_responses.pdf'
+
     if os.path.exists(file_name):
         os.remove(file_name)
     
@@ -238,68 +278,104 @@ async def get_response(query: Query):
 
 @app.post("/api/upload-pdf/")
 async def upload_pdf(file: UploadFile = File(...)):
-    if file.content_type != 'application/pdf':
-        raise HTTPException(status_code=400, detail="Invalid file type. Only PDF files are accepted.")
+    """
+    Upload a PDF containing unanswered questions, send the questions to OpenAI for answers,
+    and return a new PDF containing both the questions and the answers.
+    """
+    global global_data_context
+
+    # Step 1: Save the uploaded PDF file
+    uploads_dir = 'uploads'
+    os.makedirs(uploads_dir, exist_ok=True)
+    file_loc = os.path.join(uploads_dir, file.filename)
+    
     try:
-        # Save temporary file
-        temp_file_path = f"temp_{file.filename}"
-        with open(temp_file_path, "wb") as temp_file:
-            content = await file.read()
-            temp_file.write(content)
+        with open(file_loc, "wb") as buffer:
+            buffer.write(await file.read())
         
-        # Parse the PDF
-        parsed_text = parse_ddq(temp_file_path, "DDQs/parsedQuestions.txt", True)
+        # Step 2: Parse the uploaded PDF to extract questions
+        parsed_questions = parse_ddq(file_loc, "uploads/parsedQuestions.txt", True)
         
-        # Optionally, delete the temporary file after parsing
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+        # Clean up the parsed questions to ensure they are in the correct format
+        questions, _ = get_questions(parsed_questions)
 
+        if not questions:
+            return {"message": "No questions found in the uploaded PDF."}
 
-        gpt_call = get_questions(parsed_text)
+        # Step 3: Send each question to OpenAI and collect answers
+        answers = []
+        for question in questions:
+            print(question)
+            response = ""
 
-        produce_pdf(gpt_call[0], gpt_call[1])
+            if global_data_type == "excel":
+                category = sort_question(question)
+                global_data_context = spreadsheet_data_to_context(category, sheets)
+                response = get_gpt4_response(question, global_data_context)
 
-        return FileResponse(path="DDQs/ddq_responses.pdf", media_type='application/pdf', filename="file.pdf")
+            elif global_data_type == "pdf":
+                response = get_gpt4_response(question, global_data_context)
+
+            else:
+                parsed_context = spreadsheet_data_to_context(category, sheets)
+                response = get_gpt4_response(question, global_data_context)
+
+            answers.append(response)
+
+        # Step 4: Generate a new PDF with the questions and answers
+        file_name = 'DDQs/ddq_responses.pdf'
+        produce_pdf(questions, answers, file_name=file_name)
+        
+        # Step 5: Return the new PDF file
+        return FileResponse(file_name, media_type='application/pdf', filename="answered_ddq_responses.pdf")
+    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-        print(e)
+        print(f"Error processing the uploaded PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=e)
 
 
 @app.post("/upload/")
-async def upload_file(file: UploadFile = File(...)):
-    global global_data_context, global_data_type, global_file_loc, sheets
-
-    # Ensure the 'uploads' directory exists
+async def upload_files(files: List[UploadFile] = File(...)):
+    global global_data_context, global_data_type, sheets
     uploads_dir = 'uploads'
     os.makedirs(uploads_dir, exist_ok=True)
 
-    for item in os.listdir(uploads_dir):
-        item_path = os.path.join(uploads_dir, item)
-        
-        # Check if it is a file or a directory
-        if os.path.isfile(item_path) or os.path.islink(item_path):
-            os.remove(item_path)  # Remove the file or link
+    global_data_context = ""  # Clear previous context if needed
 
-    try:
-        global_file_loc = os.path.join(uploads_dir, file.filename)
+    for file in files:
+        try:
+            global_file_loc = os.path.join(uploads_dir, file.filename)
+            with open(global_file_loc, "wb") as buffer:
+                buffer.write(await file.read())
 
-        with open(global_file_loc, "wb") as buffer:
-            buffer.write(await file.read())
+            if file.filename.endswith('.pdf'):
+                global_data_context += parse_ddq(global_file_loc, "uploads/parsedUpload.txt", True) + "\n"
+                global_data_type = "pdf"
+            elif file.filename.endswith('.xlsx') or file.filename.endswith('.xls'):
+                sheets = pd.read_excel(global_file_loc, sheet_name=None)
+                global_data_type = "excel"
+            else:
+                raise HTTPException(status_code=400, detail="Unsupported file type")
+        except Exception as e:
+            print(e)
+            return {"message": f"Error processing file {file.filename}"}
 
-        # Process file based on extension
-        if file.filename.endswith('.pdf'):
-            global_data_context = parse_ddq(global_file_loc, "uploads/parsedUpload.txt", True)
-            global_data_type = "pdf"
-        elif file.filename.endswith('.xlsx') or file.filename.endswith('.xls'):
-            sheets = pd.read_excel(global_file_loc, sheet_name=None) 
-            global_data_type = "excel"
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported file type")
+    save_data_context()  # Save both the context and the data type
+    return {"message": "Files uploaded and processed successfully"}
 
-        return {"message": "File uploaded and processed successfully"}
-    except Exception as e:
-        print(e)
-        return {"message": "Error processing file"}
+
+@app.post("/reset/")
+def reset_data():
+    global global_data_context, sheets
+    global_data_context = ""  # Clear the global variable
+    sheets = None
+    
+    # Remove the saved data file
+    if os.path.exists(DATA_FILE):
+        os.remove(DATA_FILE)
+
+    return {"message": "Training data has been reset successfully"}
+
 
 
 if __name__ == "__main__":

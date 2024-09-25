@@ -13,6 +13,9 @@ python-dotenv
 # For OpenAI API usage
 openai
 
+# For token usage
+tiktoken
+
 # For creating and running FastAPI applications
 fastapi
 uvicorn[standard]
