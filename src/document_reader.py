@@ -149,18 +149,6 @@ def parse_ddq(pdf_path, output_path, output):
     
     return parsed
 
-def sort_question(question):
-    system_message = "You are a virtual assistant skilled in categorising questions. Here are the categories you will sort any questions into: "
-    completion = client.chat.completions.create(
-        model="gpt-4-turbo-preview",
-        messages=[
-            {"role": "system", "content": system_message + str(categories)},
-            {"role": "user", "content": "Here is the question for you to categorise: " + question + "\nOnly return the name of the category. Do not return it in quotes, and do not return any other text, whatsoever."}
-        ]
-    )
-
-    return str(completion.choices[0].message.content)
-
 
 def get_gpt4_response(prompt, all_tables_text):
     system_message = "You are a virtual assistant skilled in interpreting and responding to due diligence questionnaires. Here is the information you will need to answer the question: "
@@ -190,10 +178,8 @@ def get_questions(content):
 
     for question in questions_list:
         print('q')
-        category = sort_question(question)
-        parsed_category = spreadsheet_data_to_context(category, sheets)
 
-        response = get_gpt4_response(question, parsed_category)
+        response = get_gpt4_response(question, global_data_context)
         responses.append(response)
 
     return [questions_list, responses]
@@ -258,16 +244,10 @@ async def get_response(query: Query):
         
         response = ""
 
-        if global_data_type == "excel":
-            category = sort_question(question)
-            global_data_context = spreadsheet_data_to_context(category, sheets)
-            response = get_gpt4_response(question, global_data_context)
-
-        elif global_data_type == "pdf":
+        if global_data_type == "pdf":
             response = get_gpt4_response(question, global_data_context)
 
         else:
-            parsed_context = spreadsheet_data_to_context(category, sheets)
             response = get_gpt4_response(question, global_data_context)
 
         return {"response": response}
@@ -305,20 +285,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         # Step 3: Send each question to OpenAI and collect answers
         answers = []
         for question in questions:
-            print(question)
-            response = ""
-
-            if global_data_type == "excel":
-                category = sort_question(question)
-                global_data_context = spreadsheet_data_to_context(category, sheets)
-                response = get_gpt4_response(question, global_data_context)
-
-            elif global_data_type == "pdf":
-                response = get_gpt4_response(question, global_data_context)
-
-            else:
-                parsed_context = spreadsheet_data_to_context(category, sheets)
-                response = get_gpt4_response(question, global_data_context)
+            response = get_gpt4_response(question, global_data_context)
 
             answers.append(response)
 
@@ -351,9 +318,6 @@ async def upload_files(files: List[UploadFile] = File(...)):
             if file.filename.endswith('.pdf'):
                 global_data_context += parse_ddq(global_file_loc, "uploads/parsedUpload.txt", True) + "\n"
                 global_data_type = "pdf"
-            elif file.filename.endswith('.xlsx') or file.filename.endswith('.xls'):
-                sheets = pd.read_excel(global_file_loc, sheet_name=None)
-                global_data_type = "excel"
             else:
                 raise HTTPException(status_code=400, detail="Unsupported file type")
         except Exception as e:
