@@ -19,7 +19,7 @@ client2 = OpenAI()
 
 
 # Extract tables from PDF
-pdf_path = 'testFile.pdf'  # Replace with your PDF path
+pdf_path = 'DDQs/splitPDF.pdf'  # Replace with your PDF path
 tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
 
 # Combine all tables into a single string for GPT-4
@@ -73,13 +73,13 @@ def extract_questions_from_pdf(pdf_path):
     # Extracting questions from the first column
     questions = questions_table.iloc[:, 0].tolist()  # assuming questions are in the first column
 
-    for i in range(len(questions)):
-        questions[i] = correct_questions(questions[i])
+    # for i in range(len(questions)):
+        # questions[i] = correct_questions(questions[i])
 
     return questions
 
 # Example path to the PDF with questions
-questions_pdf_path = 'testQuestions.pdf'  # Replace with your actual PDF path
+questions_pdf_path = 'DDQs/splitPDF.pdf'  # Replace with your actual PDF path
 
 print(1)
 
