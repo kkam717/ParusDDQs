@@ -1,44 +1,77 @@
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState } from 'react';
 
-const DataUpload: React.FC = () => {
-    const [file, setFile] = useState<File | null>(null);
+const DataUpload = () => {
+    const [files, setFiles] = useState<FileList | null>(null);
+    const [uploadStatus, setUploadStatus] = useState('');
 
-    const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files && event.target.files[0]) {
-            setFile(event.target.files[0]);
-        }
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setFiles(event.target.files);
     };
 
-    const onFileUpload = async () => {
-        if (!file) {
-            alert('Please select a file first!');
+    const handleSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+
+        if (!files || files.length === 0) {
+            setUploadStatus('Please select at least one file to upload.');
             return;
         }
 
         const formData = new FormData();
-        formData.append("file", file);
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
 
         try {
-            const response = await fetch('http://localhost:8000/upload', {
+            const response = await fetch('http://localhost:8000/upload/', {
                 method: 'POST',
                 body: formData,
             });
-            if (response.ok) {
-                alert('File successfully uploaded');
-            } else {
-                alert('Upload failed');
+
+            if (!response.ok) {
+                throw new Error('Error uploading files');
             }
+
+            setUploadStatus('Files uploaded and processed successfully.');
         } catch (error) {
+            setUploadStatus('Error uploading files. Please try again.');
             console.error('Error:', error);
-            alert('Upload failed with error');
+        }
+    };
+
+    // Reset the backend data and clear the frontend file input
+    const handleReset = async () => {
+        try {
+            const response = await fetch('http://localhost:8000/reset/', {
+                method: 'POST',
+            });
+
+            if (!response.ok) {
+                throw new Error('Error resetting data');
+            }
+
+            setUploadStatus('Training data has been reset successfully.');
+            setFiles(null); // Clear the frontend file input
+
+        } catch (error) {
+            setUploadStatus('Error resetting data. Please try again.');
+            console.error('Error:', error);
         }
     };
 
     return (
         <div>
-            <h2>Upload Training Data</h2>
-            <input type="file" onChange={onFileChange} accept=".pdf, .xlsx, .xls" />
-            <button onClick={onFileUpload}>Upload!</button>
+            <h2>Upload Training Data (PDF/Excel)</h2>
+            <form onSubmit={handleSubmit}>
+                <input
+                    type="file"
+                    accept=".pdf,.xlsx,.xls"
+                    multiple
+                    onChange={handleFileUpload}
+                />
+                <button type="submit">Upload Files</button>
+            </form>
+            <button onClick={handleReset}>Reset Data</button>
+            {uploadStatus && <p>{uploadStatus}</p>}
         </div>
     );
 };
